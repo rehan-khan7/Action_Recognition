@@ -1,0 +1,8 @@
+[MASTER]
+init-hook=import sys, os; conda_prefix = os.environ.get("CONDA_PREFIX");
+    site_packages = os.path.join(conda_prefix, "lib", "python3.8", "site-packages") if conda_prefix else None;\ 
+    sys.path.append(site_packages) if site_packages and os.path.exists(site_packages) else None
+[MESSAGES CONTROL]
+disable=C0114,C0115,C0116,R0903,W1203,protected-access,missing-docstring,invalid-name,no-member,import-error
+[FORMAT]
+max-line-length=400

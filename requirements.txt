@@ -1,0 +1,9 @@
+tensorflow
+tensorflow-hub
+opencv-python
+ffmpeg-python
+fastapi
+uvicorn
+numpy
+flask
+requests
