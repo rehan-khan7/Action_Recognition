@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action Recognition in Sports Videos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Action Recognition in Sports Videos</h1>
+        <p>Upload a sports video to detect actions like shooting, passing, or dribbling.</p>
+        
+        <!-- Flash messages for errors -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert">
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Video upload form -->
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="video" accept="video/mp4,video/avi" required>
+            <button type="submit">Upload and Analyze</button>
+        </form>
+        
+        <!-- Display results -->
+        {% if actions %}
+            <h2>Recognized Actions:</h2>
+            <ul>
+                {% for action in actions %}
+                    <li>{{ action }}</li>
+                {% endfor %}
+            </ul>
+            {% if video_file %}
+                <h2>Uploaded Video:</h2>
+                <video width="640" height="480" controls>
+                    <source src="{{ url_for('static', filename='uploads/' + video_file) }}" type="video/mp4">
+                    <source src="{{ url_for('static', filename='uploads/' + video_file) }}" type="video/x-msvideo">
+                    Your browser does not support the video tag or the video format.
+                </video>
+            {% endif %}
+        {% endif %}
+    </div>
+</body>
+</html>
