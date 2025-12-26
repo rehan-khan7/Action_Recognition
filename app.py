@@ -6,77 +6,70 @@ import time
 import requests
 from flask import Flask, flash, redirect, render_template, request, url_for
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 app = Flask(__name__)
-API_URL = "http://127.0.0.1:8000/recognize_action"
-UPLOAD_FOLDER = "static/uploads"
 
-# Ensure upload folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+SERVICE_ENDPOINT = "http://127.0.0.1:8000/recognize_action"
+UPLOAD_DIR = "static/uploads"
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def clean_old_files():
-    """Remove files older than 5 minutes from the upload folder."""
-    current_time = time.time()
-    for file_path in glob.glob(os.path.join(UPLOAD_FOLDER, "*")):
-        if os.path.isfile(file_path):
-            file_age = current_time - os.path.getmtime(file_path)
-            if file_age > 300:  # 5 minutes
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Removed old file: {file_path}")
-                except Exception as e:  # pylint: disable=broad-except
-                    logger.error(f"Error removing file {file_path}: {e}")
+def remove_stale_uploads(retention_seconds=300):
+    now = time.time()
+    for path in glob.glob(os.path.join(UPLOAD_DIR, "*")):
+        if os.path.isfile(path) and now - os.path.getmtime(path) > retention_seconds:
+            try:
+                os.remove(path)
+                log.info("Deleted stale upload: %s", path)
+            except Exception as exc:  # pylint: disable=broad-except
+                log.error("Could not delete %s: %s", path, exc)
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        # Clean old files
-        clean_old_files()
+        remove_stale_uploads()
 
-        # Check if a video file is uploaded
         if "video" not in request.files:
             flash("No video file uploaded")
             return redirect(url_for("index"))
 
-        video = request.files["video"]
-        if video.filename == "":
+        file_storage = request.files["video"]
+        if file_storage.filename == "":
             flash("No video selected")
             return redirect(url_for("index"))
 
-        # Save video with a unique filename
-        timestamp = int(time.time())
-        video_filename = f"{timestamp}_{video.filename}"
-        video_path = os.path.join(UPLOAD_FOLDER, video_filename)
-        video.save(video_path)
-        logger.info(f"Saved video to: {video_path}")
+        ts = int(time.time())
+        saved_name = f"{ts}_{file_storage.filename}"
+        saved_path = os.path.join(UPLOAD_DIR, saved_name)
+        file_storage.save(saved_path)
+        log.info("Saved upload: %s", saved_path)
 
-        # Send video to FastAPI backend
         try:
-            with open(video_path, "rb") as f:
-                files = {"video": (video.filename, f, "video/mp4")}
-                response = requests.post(API_URL, files=files, timeout=60)
+            with open(saved_path, "rb") as fh:
+                files = {"video": (file_storage.filename, fh, "video/mp4")}
+                resp = requests.post(SERVICE_ENDPOINT, files=files, timeout=60)
 
-            if response.status_code == 200:
-                actions = response.json().get("actions", [])
-                # Pass the video filename to the template
+            if resp.status_code == 200:
+                actions = resp.json().get("actions", [])
                 return render_template(
-                    "index.html", actions=actions, video_file=video_filename
+                    "index.html", actions=actions, video_file=saved_name
                 )
-        except Exception as e:  # pylint: disable=broad-except
-            flash(f"Error: {str(e)}")
-            # Remove video on error
-            if os.path.exists(video_path):
-                os.remove(video_path)
-                logger.info(f"Removed video on error: {video_path}")
+        except Exception as exc:  # pylint: disable=broad-except
+            flash(f"Error: {exc}")
+            if os.path.exists(saved_path):
+                try:
+                    os.remove(saved_path)
+                    log.info("Removed upload after error: %s", saved_path)
+                except Exception as rm_exc:
+                    log.error("Failed removing file %s: %s", saved_path, rm_exc)
+
         return redirect(url_for("index"))
 
-    # Clean old files on GET request
-    clean_old_files()
+    remove_stale_uploads()
     return render_template("index.html", actions=None, video_file=None)
 
 
